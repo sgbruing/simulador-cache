@@ -27,6 +27,37 @@ typedef struct {
     int politica_substituicao;
 } Cache;
 
+Cache* inicializar_cache(int quantidade_conjuntos, int linhas_por_conjunto, int tamanho_linha, int politica_escrita, int tempo_acesso, int politica_substituicao) {
+    Cache *cache = (Cache *)malloc(sizeof(Cache));
+    cache->quantidade_conjuntos = quantidade_conjuntos;
+    cache->linhas_por_conjunto = linhas_por_conjunto;
+    cache->tamanho_linha = tamanho_linha;
+    cache->politica_escrita = politica_escrita;
+    cache->tempo_acesso = tempo_acesso;
+    cache->politica_substituicao = politica_substituicao;
+
+    cache->conjuntos = (ConjuntoCache *)malloc(quantidade_conjuntos * sizeof(ConjuntoCache));
+    for (int i = 0; i < quantidade_conjuntos; i++) {
+        cache->conjuntos[i].linhas = (LinhaCache *)malloc(linhas_por_conjunto * sizeof(LinhaCache));
+        for (int j = 0; j < linhas_por_conjunto; j++) {
+            cache->conjuntos[i].linhas[j].valido = 0;
+            cache->conjuntos[i].linhas[j].sujo = 0;
+            cache->conjuntos[i].linhas[j].tag = 0;
+            cache->conjuntos[i].linhas[j].contador_lru = 0;
+            cache->conjuntos[i].linhas[j].contador_lfu = 0;
+        }
+    }
+    return cache;
+}
+
+void liberar_cache(Cache *cache) {
+    for (int i = 0; i < cache->quantidade_conjuntos; i++) {
+        free(cache->conjuntos[i].linhas);
+    }
+    free(cache->conjuntos);
+    free(cache);
+}
+
 void ler_parametros(int *politica_escrita, int *tamanho_linha, int *num_linhas, int *associatividade, int *tempo_acesso, int *tempo_leitura_memoria, int *tempo_escrita_memoria, int *politica_substituicao, char *arquivo_entrada, char *arquivo_saida) {
     printf("Informe a politica de escrita (0 para write-through, 1 para write-back): ");
     scanf("%d", politica_escrita);
@@ -62,5 +93,10 @@ int main() {
     char arquivo_entrada[100], arquivo_saida[100];
 
     ler_parametros(&politica_escrita, &tamanho_linha, &num_linhas, &associatividade, &tempo_acesso, &tempo_leitura_memoria, &tempo_escrita_memoria, &politica_substituicao, arquivo_entrada, arquivo_saida);
+
+    int quantidade_conjuntos = num_linhas / associatividade;
+    Cache *cache = inicializar_cache(quantidade_conjuntos, associatividade, tamanho_linha, politica_escrita, tempo_acesso, politica_substituicao);
+
+    int total_enderecos = 0, cont_leituras = 0, cont_escritas = 0, cont_acertos = 0, cont_falhas = 0, leituras_memoria = 0, escritas_memoria = 0;
 
 }
