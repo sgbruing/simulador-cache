@@ -1,0 +1,17 @@
+Política de Escrita: 2
+Tamanho da Linha: 2 bytes
+Número de Linhas: 2
+Associatividade: 2
+Tempo de Acesso: 2 ns
+Tempo de Leitura da Memória Principal: 2 ns
+Tempo de Escrita da Memória Principal: 2 ns
+Política de Substituição: 2
+Total de Endereços: 100
+Total de Leituras: 88
+Total de Escritas: 12
+Leituras na Memória Principal: 88
+Escritas na Memória Principal: 0
+Taxa de Acerto em Leituras: 5.6818% (5)
+Taxa de Acerto em Escritas: 41.6667% (5)
+Taxa de Acerto Global: 5.0000% (5)
+Tempo Médio de Acesso: 3.9000 ns
