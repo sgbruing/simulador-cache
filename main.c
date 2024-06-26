@@ -181,6 +181,39 @@ void processar_arquivo_entrada(char *arquivo_entrada, Cache *cache, int *total_e
     fclose(arquivo);
 }
 
+void calcular_metricas(int total_enderecos, int cont_leituras, int cont_escritas, int cont_acertos, int cont_falhas, int leituras_memoria, int escritas_memoria, int tempo_acesso, int tempo_leitura_memoria, int tempo_escrita_memoria, char *arquivo_saida, int politica_escrita, int tamanho_linha, int num_linhas, int associatividade, int politica_substituicao) {
+    double taxa_acerto_leitura = (double)cont_acertos / cont_leituras * 100;
+    double taxa_acerto_escrita = (double)cont_acertos / cont_escritas * 100;
+    double taxa_acerto_global = (double)cont_acertos / total_enderecos * 100;
+    double tempo_medio_acesso = ((double)cont_acertos * tempo_acesso + (double)cont_falhas * (tempo_leitura_memoria + tempo_acesso)) / total_enderecos;
+
+    FILE *saida = fopen(arquivo_saida, "w");
+    if (saida == NULL) {
+        perror("Erro ao abrir o arquivo de saída");
+        exit(1);
+    }
+
+    fprintf(saida, "Política de Escrita: %d\n", politica_escrita);
+    fprintf(saida, "Tamanho da Linha: %d bytes\n", tamanho_linha);
+    fprintf(saida, "Número de Linhas: %d\n", num_linhas);
+    fprintf(saida, "Associatividade: %d\n", associatividade);
+    fprintf(saida, "Tempo de Acesso: %d ns\n", tempo_acesso);
+    fprintf(saida, "Tempo de Leitura da Memória Principal: %d ns\n", tempo_leitura_memoria);
+    fprintf(saida, "Tempo de Escrita da Memória Principal: %d ns\n", tempo_escrita_memoria);
+    fprintf(saida, "Política de Substituição: %d\n", politica_substituicao);
+    fprintf(saida, "Total de Endereços: %d\n", total_enderecos);
+    fprintf(saida, "Total de Leituras: %d\n", cont_leituras);
+    fprintf(saida, "Total de Escritas: %d\n", cont_escritas);
+    fprintf(saida, "Leituras na Memória Principal: %d\n", leituras_memoria);
+    fprintf(saida, "Escritas na Memória Principal: %d\n", escritas_memoria);
+    fprintf(saida, "Taxa de Acerto em Leituras: %.4f%% (%d)\n", taxa_acerto_leitura, cont_acertos);
+    fprintf(saida, "Taxa de Acerto em Escritas: %.4f%% (%d)\n", taxa_acerto_escrita, cont_acertos);
+    fprintf(saida, "Taxa de Acerto Global: %.4f%% (%d)\n", taxa_acerto_global, cont_acertos);
+    fprintf(saida, "Tempo Médio de Acesso: %.4f ns\n", tempo_medio_acesso);
+
+    fclose(saida);
+}
+
 int main() {
 
     int politica_escrita, tamanho_linha, num_linhas, associatividade, tempo_acesso, tempo_leitura_memoria, tempo_escrita_memoria, politica_substituicao;
@@ -195,6 +228,9 @@ int main() {
 
     processar_arquivo_entrada(arquivo_entrada, cache, &total_enderecos, &cont_leituras, &cont_escritas, &cont_acertos, &cont_falhas, &leituras_memoria, &escritas_memoria);
 
+    calcular_metricas(total_enderecos, cont_leituras, cont_escritas, cont_acertos, cont_falhas, leituras_memoria, escritas_memoria, tempo_acesso, tempo_leitura_memoria, tempo_escrita_memoria, arquivo_saida, politica_escrita, tamanho_linha, num_linhas, associatividade, politica_substituicao);
 
+    liberar_cache(cache);
 
+    return 0;
 }
