@@ -39,7 +39,6 @@ int contar_bits_zero_a_direita(int x) {
 
 // Função para extrair o conjunto e o rótulo de um endereço
 void extrair_endereco(uint32_t endereco, int *conjunto, int *rotulo, int bits_conjunto, int bits_palavra) {
-    int bits_rotulo = TAM_ENDERECO - bits_conjunto - bits_palavra;
     *conjunto = (endereco >> bits_palavra) & ((1 << bits_conjunto) - 1);
     *rotulo = endereco >> (bits_conjunto + bits_palavra);
 }
