@@ -8,7 +8,7 @@
 typedef struct {
     int valido;
     int sujo;
-    uint32_t tag;
+    uint32_t rotulo;
     int contador_lru; // Para LRU
     int contador_lfu; // Para LFU
 } LinhaCache;
@@ -27,40 +27,56 @@ typedef struct {
     int politica_substituicao;
 } Cache;
 
-void extrair_endereco(uint32_t endereco, int *indice, int *tag, int bits_indice, int bits_deslocamento) {
-    int bits_tag = TAM_ENDERECO - bits_indice - bits_deslocamento;
-    *indice = (endereco >> bits_deslocamento) & ((1 << bits_indice) - 1);
-    *tag = endereco >> (bits_indice + bits_deslocamento);
+// Função para contar bits em zero à direita
+int contar_bits_zero_a_direita(int x) {
+    int contador = 0;
+    while ((x & 1) == 0) {
+        x >>= 1;
+        contador++;
+    }
+    return contador;
 }
 
-void simular_cache(Cache *cache, uint32_t endereco, char operacao, int *cont_acertos, int *cont_falhas, int *leituras_memoria, int *escritas_memoria) {
-    int bits_deslocamento = __builtin_ctz(cache->tamanho_linha); //bit counting
-    int bits_indice = __builtin_ctz(cache->quantidade_conjuntos);
-    int indice, tag;
-    extrair_endereco(endereco, &indice, &tag, bits_indice, bits_deslocamento);
+// Função para extrair o conjunto e o rótulo de um endereço
+void extrair_endereco(uint32_t endereco, int *conjunto, int *rotulo, int bits_conjunto, int bits_palavra) {
+    int bits_rotulo = TAM_ENDERECO - bits_conjunto - bits_palavra;
+    *conjunto = (endereco >> bits_palavra) & ((1 << bits_conjunto) - 1);
+    *rotulo = endereco >> (bits_conjunto + bits_palavra);
+}
 
-    ConjuntoCache *conjunto = &cache->conjuntos[indice];
+// Função para simular um acesso à cache
+void simular_cache(Cache *cache, uint32_t endereco, char operacao, int *cont_acertos, int *cont_falhas, int *leituras_memoria, int *escritas_memoria) {
+    int bits_palavra = contar_bits_zero_a_direita(cache->tamanho_linha);
+    int bits_conjunto = contar_bits_zero_a_direita(cache->quantidade_conjuntos);
+    int conjunto, rotulo;
+    extrair_endereco(endereco, &conjunto, &rotulo, bits_conjunto, bits_palavra);
+
+    ConjuntoCache *conj = &cache->conjuntos[conjunto];
     int acerto = 0;
     int linha_vazia = -1;
     int linha_substituir = 0;
 
     // Verificar se há um acerto e encontrar uma linha vazia ou candidata para substituição
     for (int i = 0; i < cache->linhas_por_conjunto; i++) {
-        if (conjunto->linhas[i].valido && conjunto->linhas[i].tag == tag) {
+        if (conj->linhas[i].valido && conj->linhas[i].rotulo == rotulo) {
             acerto = 1;
-            conjunto->linhas[i].contador_lru = 0;
-            conjunto->linhas[i].contador_lfu++;
-            if (operacao == 'W' && cache->politica_escrita == 1) {
-                conjunto->linhas[i].sujo = 1;
+            conj->linhas[i].contador_lru = 0;
+            conj->linhas[i].contador_lfu++;
+            if (operacao == 'W') {
+                if (cache->politica_escrita == 0) { // Write-through
+                    (*escritas_memoria)++;
+                } else if (cache->politica_escrita == 1) { // Write-back
+                    conj->linhas[i].sujo = 1;
+                }
             }
             break;
         }
-        if (!conjunto->linhas[i].valido && linha_vazia == -1) {
+        if (!conj->linhas[i].valido && linha_vazia == -1) {
             linha_vazia = i;
         }
-        if (cache->politica_substituicao == 1 && conjunto->linhas[i].contador_lru > conjunto->linhas[linha_substituir].contador_lru) {
+        if (cache->politica_substituicao == 1 && conj->linhas[i].contador_lru > conj->linhas[linha_substituir].contador_lru) {
             linha_substituir = i;
-        } else if (cache->politica_substituicao == 2 && conjunto->linhas[i].contador_lfu < conjunto->linhas[linha_substituir].contador_lfu) {
+        } else if (cache->politica_substituicao == 2 && conj->linhas[i].contador_lfu < conj->linhas[linha_substituir].contador_lfu) {
             linha_substituir = i;
         }
     }
@@ -69,31 +85,32 @@ void simular_cache(Cache *cache, uint32_t endereco, char operacao, int *cont_ace
     if (acerto) {
         (*cont_acertos)++;
     } else {
-        // Lida com a falha
+        // Lidar com a falha
         (*cont_falhas)++;
         if (operacao == 'R') {
             (*leituras_memoria)++;
-        } else if (operacao == 'W' && cache->politica_escrita == 0) {
+        } else if (operacao == 'W' && cache->politica_escrita == 0) { // Write-through
             (*escritas_memoria)++;
         }
 
         int linha_usar = (linha_vazia != -1) ? linha_vazia : linha_substituir;
 
-        if (cache->politica_escrita == 1 && conjunto->linhas[linha_usar].valido && conjunto->linhas[linha_usar].sujo) {
+        // Se a política for write-back e a linha a ser substituída estiver suja, escreva de volta para a memória principal
+        if (cache->politica_escrita == 1 && conj->linhas[linha_usar].valido && conj->linhas[linha_usar].sujo) {
             (*escritas_memoria)++;
         }
 
-        conjunto->linhas[linha_usar].valido = 1;
-        conjunto->linhas[linha_usar].tag = tag;
-        conjunto->linhas[linha_usar].contador_lru = 0;
-        conjunto->linhas[linha_usar].contador_lfu = 1;
-        conjunto->linhas[linha_usar].sujo = (operacao == 'W') ? 1 : 0;
+        conj->linhas[linha_usar].valido = 1;
+        conj->linhas[linha_usar].rotulo = rotulo;
+        conj->linhas[linha_usar].contador_lru = 0;
+        conj->linhas[linha_usar].contador_lfu = 1;
+        conj->linhas[linha_usar].sujo = (operacao == 'W') ? 1 : 0;
     }
 
     // Atualizar contadores LRU
     for (int i = 0; i < cache->linhas_por_conjunto; i++) {
-        if (conjunto->linhas[i].valido) {
-            conjunto->linhas[i].contador_lru++;
+        if (conj->linhas[i].valido) {
+            conj->linhas[i].contador_lru++;
         }
     }
 }
@@ -113,7 +130,7 @@ Cache* inicializar_cache(int quantidade_conjuntos, int linhas_por_conjunto, int 
         for (int j = 0; j < linhas_por_conjunto; j++) {
             cache->conjuntos[i].linhas[j].valido = 0;
             cache->conjuntos[i].linhas[j].sujo = 0;
-            cache->conjuntos[i].linhas[j].tag = 0;
+            cache->conjuntos[i].linhas[j].rotulo = 0;
             cache->conjuntos[i].linhas[j].contador_lru = 0;
             cache->conjuntos[i].linhas[j].contador_lfu = 0;
         }
@@ -130,31 +147,34 @@ void liberar_cache(Cache *cache) {
 }
 
 void ler_parametros(int *politica_escrita, int *tamanho_linha, int *num_linhas, int *associatividade, int *tempo_acesso, int *tempo_leitura_memoria, int *tempo_escrita_memoria, int *politica_substituicao, char *arquivo_entrada, char *arquivo_saida) {
-    printf("Informe a politica de escrita (0 para write-through, 1 para write-back): ");
+    printf("Informe a política de escrita (0 para write-through, 1 para write-back): ");
     scanf("%d", politica_escrita);
     printf("Informe o tamanho da linha (bytes): ");
     scanf("%d", tamanho_linha);
-    printf("Informe o numero de linhas: ");
+    printf("Informe o número de linhas: ");
     scanf("%d", num_linhas);
     printf("Informe a associatividade: ");
     scanf("%d", associatividade);
     printf("Informe o tempo de acesso (ns): ");
     scanf("%d", tempo_acesso);
-    printf("Informe o tempo de leitura da memoria principal (ns): ");
+    printf("Informe o tempo de leitura da memória principal (ns): ");
     scanf("%d", tempo_leitura_memoria);
-    printf("Informe o tempo de escrita da memoria principal (ns): ");
+    printf("Informe o tempo de escrita da memória principal (ns): ");
     scanf("%d", tempo_escrita_memoria);
-    printf("Informe a politica de substituicao (0 para Aleatoria, 1 para LRU, 2 para LFU): ");
+    printf("Informe a política de substituição (0 para Aleatória, 1 para LRU, 2 para LFU): ");
     scanf("%d", politica_substituicao);
     
+    // Consumir o caractere de nova linha deixado no buffer pelo scanf anterior
     getchar();
     
-    printf("Informe o nome do arquivo de entrada (com caminho): ");
+    printf("Informe o nome do arquivo de entrada: ");
     fgets(arquivo_entrada, 100, stdin);
+    // Remover o caractere de nova linha lido pelo fgets
     arquivo_entrada[strcspn(arquivo_entrada, "\n")] = 0;
 
-    printf("Informe o nome do arquivo de saida: ");
+    printf("Informe o nome do arquivo de saída: ");
     fgets(arquivo_saida, 100, stdin);
+    // Remover o caractere de nova linha lido pelo fgets
     arquivo_saida[strcspn(arquivo_saida, "\n")] = 0;
 }
 
@@ -215,7 +235,6 @@ void calcular_metricas(int total_enderecos, int cont_leituras, int cont_escritas
 }
 
 int main() {
-
     int politica_escrita, tamanho_linha, num_linhas, associatividade, tempo_acesso, tempo_leitura_memoria, tempo_escrita_memoria, politica_substituicao;
     char arquivo_entrada[100], arquivo_saida[100];
 
