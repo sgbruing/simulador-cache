@@ -1,6 +1,6 @@
 Política de Escrita: 0
 Tamanho da Linha: 128 bytes
-Número de Linhas: 16
+Número de Linhas: 4
 Associatividade: 4
 Tempo de Acesso: 10 ns
 Tempo de Leitura da Memória Principal: 60 ns
@@ -9,9 +9,9 @@ Política de Substituição: 1
 Total de Endereços: 51200
 Total de Leituras: 45056
 Total de Escritas: 6144
-Leituras na Memória Principal: 21504
+Leituras na Memória Principal: 24064
 Escritas na Memória Principal: 6144
-Taxa de Acerto em Leituras: 61.3636% (27648)
-Taxa de Acerto em Escritas: 450.0000% (27648)
-Taxa de Acerto Global: 54.0000% (27648)
-Tempo Médio de Acesso: 37.6000 ns
+Taxa de Acerto em Leituras: 55.6818% (25088)
+Taxa de Acerto em Escritas: 408.3333% (25088)
+Taxa de Acerto Global: 49.0000% (25088)
+Tempo Médio de Acesso: 40.6000 ns
